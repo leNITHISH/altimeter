@@ -8,8 +8,13 @@
 #include "altitude.h"
 
 #define LED P2_0
+#define BTN P3_3		/* active low, onboard button (JP2) */
 
-#define P0_STD 101325UL		/* Pa, standard sea level */
+#define P0_STD		101325UL	/* Pa, standard sea level */
+#define POLL_MS		50
+#define SAMPLE_POLLS	5		/* read the sensor every 250 ms */
+#define HOLD_POLLS	40		/* 2 s hold = back to absolute mode */
+#define AVG_SHIFT	3		/* running average over ~8 samples */
 
 /* print v (in tenths) right-aligned in width chars, e.g. 1008.4 */
 static void lcd_tenths(int32_t v, uint8_t width)
@@ -36,9 +41,11 @@ static void lcd_tenths(int32_t v, uint8_t width)
 
 void main(void)
 {
-	uint8_t id;
+	uint8_t id, poll = 0, held = 0;
+	uint8_t relative = 0;
 	int32_t t, alt;
-	uint32_t p;
+	uint32_t p, p_avg, p0 = P0_STD;
+	uint32_t p_sum = 0;		/* (1 << AVG_SHIFT) x average pressure */
 
 	uart_init();
 	lcd_init();
@@ -54,20 +61,42 @@ void main(void)
 	delay_ms(200);		/* first IIR-filtered sample */
 
 	for (;;) {
-		LED = !LED;
-		if (bme280_read(&t, &p)) {
-			alt = altitude_dm(p) - altitude_dm(P0_STD);
+		/* press = zero here (relative mode), hold 2 s = absolute mode */
+		if (!BTN) {
+			if (held < 255)
+				held++;
+			if (held == 2 && p_sum) {
+				p0 = p_sum >> AVG_SHIFT;
+				relative = 1;
+				poll = 0;	/* show the new zero right away */
+			} else if (held == HOLD_POLLS) {
+				p0 = P0_STD;
+				relative = 0;
+				poll = 0;
+			}
+		} else {
+			held = 0;
+		}
+
+		if (poll == 0 && bme280_read(&t, &p)) {
+			LED = !LED;
+			if (!p_sum)
+				p_sum = p << AVG_SHIFT;
+			p_sum += p - (p_sum >> AVG_SHIFT);
+			p_avg = p_sum >> AVG_SHIFT;
+			alt = altitude_dm(p_avg) - altitude_dm(p0);
 
 			lcd_goto(0, 0);
 			lcd_puts("Alt:");
 			lcd_tenths(alt, 8);
-			lcd_puts(" m  ");
+			lcd_puts(" m ");
+			lcd_putc(relative ? 'R' : 'A');
 
 			lcd_goto(0, 1);
 			lcd_putc('T');
 			lcd_tenths(t / 10, 5);
 			lcd_puts("C P");
-			lcd_tenths(p / 10, 6);
+			lcd_tenths(p_avg / 10, 6);
 			lcd_putc(' ');
 
 			uart_puts("T=");
@@ -76,8 +105,11 @@ void main(void)
 			uart_put_i32(p);
 			uart_puts(" alt=");
 			uart_put_i32(alt);
+			uart_putc(relative ? 'R' : 'A');
 			uart_crlf();
 		}
-		delay_ms(250);
+		if (++poll >= SAMPLE_POLLS)
+			poll = 0;
+		delay_ms(POLL_MS);
 	}
 }

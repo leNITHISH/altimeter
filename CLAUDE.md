@@ -35,7 +35,8 @@ BME280 pressure sensor → AT89S52 → 16x2 HD44780 LCD. Shows altitude (and tem
 
 ## Firmware design
 
-- Files: `main.c`, `i2c.c/.h`, `lcd.c/.h`, `bme280.c/.h`, `uart.c/.h`, `delay.c/.h`
+- Files: `main.c`, `i2c.c/.h`, `lcd.c/.h`, `bme280.c/.h`, `uart.c/.h`, `delay.c/.h`, `altitude.c/.h` (lookup table from `tools/gen_alt_table.py`)
+- Fitted sensor is actually a BMP280 (ID 0x58) at 0x76. Direct RAM (0x08-0x7F) is the tight resource, not flash: put buffers/structs in `__idata` and mark 32-bit-heavy internal functions `__reentrant`. No external RAM, so never use `__xdata` or medium/large models.
 - Use Bosch's 32-bit integer compensation formulas (datasheet section 4.2.3 / 8.2); avoid 64-bit math, too heavy for 8051.
 - Altitude: `h = 44330 * (1 - (P/P0)^0.1903)`. Floating `powf` may blow the 8 KB budget; check `make size`. If too big, use a fixed-point approximation (≈8.3 m per hPa near sea level, or a small lookup table with interpolation).
 - Two modes: absolute (P0 = 1013.25 hPa) and relative (P0 = pressure captured when P3.3 is pressed). Relative is the main demo mode since it's near sea level here.
