@@ -36,7 +36,7 @@ void uart_put_hex8(uint8_t v)
 
 void uart_put_i32(int32_t v)
 {
-	char buf[11];
+	__idata char buf[11];
 	uint8_t i = 0;
 	uint32_t u;
 

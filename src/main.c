@@ -4,63 +4,80 @@
 #include "uart.h"
 #include "lcd.h"
 #include "i2c.h"
+#include "bme280.h"
+#include "altitude.h"
 
 #define LED P2_0
 
-static void lcd_hex8(uint8_t v)
-{
-	uint8_t n = v >> 4;
+#define P0_STD 101325UL		/* Pa, standard sea level */
 
-	lcd_putc(n < 10 ? '0' + n : 'A' - 10 + n);
-	n = v & 0x0F;
-	lcd_putc(n < 10 ? '0' + n : 'A' - 10 + n);
+/* print v (in tenths) right-aligned in width chars, e.g. 1008.4 */
+static void lcd_tenths(int32_t v, uint8_t width)
+{
+	__idata char buf[9];
+	uint8_t i = sizeof(buf);
+	uint8_t neg = v < 0;
+	uint32_t u = neg ? -v : v;
+
+	buf[--i] = '0' + u % 10;
+	u /= 10;
+	buf[--i] = '.';
+	do {
+		buf[--i] = '0' + u % 10;
+		u /= 10;
+	} while (u && i);
+	if (neg && i)
+		buf[--i] = '-';
+	while (sizeof(buf) - i < width)
+		lcd_putc(' '), width--;
+	while (i < sizeof(buf))
+		lcd_putc(buf[i++]);
 }
 
 void main(void)
 {
-	uint8_t a, found = 0, sensor = 0, id = 0;
+	uint8_t id;
+	int32_t t, alt;
+	uint32_t p;
 
 	uart_init();
 	lcd_init();
 	i2c_init();
 
-	/* line 1: every address that ACKs */
-	lcd_puts("I2C:");
-	uart_puts("i2c scan:");
-	for (a = 0x08; a < 0x78; a++) {
-		if (i2c_probe(a)) {
-			if (found < 4) {
-				lcd_putc(' ');
-				lcd_hex8(a);
-			}
-			uart_putc(' ');
-			uart_put_hex8(a);
-			found++;
-			if (a == 0x76 || a == 0x77)
-				sensor = a;
-		}
+	id = bme280_init();
+	if (!id) {
+		lcd_puts("No sensor");
+		for (;;)
+			;
 	}
-	if (!found)
-		lcd_puts(" none");
-	uart_crlf();
-
-	/* line 2: chip ID of the pressure sensor */
-	lcd_goto(0, 1);
-	if (!sensor) {
-		lcd_puts("no 76/77");
-	} else if (!i2c_read_regs(sensor, 0xD0, &id, 1)) {
-		lcd_puts("ID read fail");
-	} else {
-		lcd_puts("ID ");
-		lcd_hex8(id);
-		lcd_puts(id == 0x60 ? " BME280" : id == 0x58 ? " BMP280" : " ???");
-		uart_puts("chip id ");
-		uart_put_hex8(id);
-		uart_crlf();
-	}
+	lcd_puts(id == BME280_ID ? "BME280" : "BMP280");
+	delay_ms(200);		/* first IIR-filtered sample */
 
 	for (;;) {
 		LED = !LED;
-		delay_ms(500);
+		if (bme280_read(&t, &p)) {
+			alt = altitude_dm(p) - altitude_dm(P0_STD);
+
+			lcd_goto(0, 0);
+			lcd_puts("Alt:");
+			lcd_tenths(alt, 8);
+			lcd_puts(" m  ");
+
+			lcd_goto(0, 1);
+			lcd_putc('T');
+			lcd_tenths(t / 10, 5);
+			lcd_puts("C P");
+			lcd_tenths(p / 10, 6);
+			lcd_putc(' ');
+
+			uart_puts("T=");
+			uart_put_i32(t);
+			uart_puts(" P=");
+			uart_put_i32(p);
+			uart_puts(" alt=");
+			uart_put_i32(alt);
+			uart_crlf();
+		}
+		delay_ms(250);
 	}
 }
