@@ -6,6 +6,7 @@
 #include "i2c.h"
 #include "bme280.h"
 #include "altitude.h"
+#include "contrast.h"
 
 #define LED P2_0
 #define BTN P3_3		/* active low, onboard button (JP2) */
@@ -15,6 +16,7 @@
 #define SAMPLE_POLLS	5		/* read the sensor every 250 ms */
 #define HOLD_POLLS	40		/* 2 s hold = back to absolute mode */
 #define AVG_SHIFT	3		/* running average over ~8 samples */
+#define CONTRAST_PCT	40		/* tune with the CONTRAST_SWEEP build */
 
 /* print v (in tenths) right-aligned in width chars, e.g. 1008.4 */
 static void lcd_tenths(int32_t v, uint8_t width)
@@ -39,6 +41,30 @@ static void lcd_tenths(int32_t v, uint8_t width)
 		lcd_putc(buf[i++]);
 }
 
+#ifdef CONTRAST_SWEEP
+/* make clean flash EXTRA=-DCONTRAST_SWEEP: steps the contrast every 3 s,
+ * pick the % that reads best straight on and set CONTRAST_PCT to it */
+static void contrast_sweep(void)
+{
+	uint8_t pct = 0;
+
+	for (;;) {
+		contrast_set(pct);
+		lcd_clear();
+		lcd_puts("Contrast ");
+		lcd_putc('0' + pct / 10);
+		lcd_putc('0' + pct % 10);
+		lcd_putc('%');
+		lcd_goto(0, 1);
+		lcd_puts("0123456789ABCDEF");
+		delay_ms(3000);
+		pct += 5;
+		if (pct > 60)
+			pct = 0;
+	}
+}
+#endif
+
 void main(void)
 {
 	uint8_t id, poll = 0, held = 0;
@@ -47,8 +73,12 @@ void main(void)
 	uint32_t p, p_avg, p0 = P0_STD;
 	uint32_t p_sum = 0;		/* (1 << AVG_SHIFT) x average pressure */
 
+	contrast_init(CONTRAST_PCT);
 	uart_init();
 	lcd_init();
+#ifdef CONTRAST_SWEEP
+	contrast_sweep();
+#endif
 	i2c_init();
 
 	id = bme280_init();
