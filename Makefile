@@ -1,7 +1,7 @@
 CC      = sdcc
 CFLAGS  = -mmcs51 --model-small --code-size 8192 --iram-size 256 --std-sdcc11 $(EXTRA)
 BUILD   = build
-SRCS    = main.c delay.c uart.c lcd.c i2c.c bme280.c altitude.c contrast.c
+SRCS    = main.c delay.c uart.c lcd.c i2c.c bme280.c altitude.c
 OBJS    = $(addprefix $(BUILD)/,$(SRCS:.c=.rel))
 HDRS    = $(wildcard src/*.h)
 

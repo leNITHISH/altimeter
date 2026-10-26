@@ -25,3 +25,25 @@ void delay_us(unsigned char us)
 	while (us--)
 		;
 }
+
+/* 50 ms = 46080 machine cycles; reload 65536 - 46080 = 0x4C00 */
+#define T2_TICK_H 0x4C
+#define T2_TICK_L 0x00
+
+void tick_init(void)
+{
+	T2CON = 0;			/* 16-bit auto-reload, timer mode, stopped */
+	RCAP2H = T2_TICK_H;
+	RCAP2L = T2_TICK_L;
+	TH2 = T2_TICK_H;
+	TL2 = T2_TICK_L;
+	TF2 = 0;
+	TR2 = 1;
+}
+
+void tick_wait(void)
+{
+	while (!TF2)
+		;
+	TF2 = 0;
+}
