@@ -1,7 +1,13 @@
 CC      = sdcc
 CFLAGS  = -mmcs51 --model-small --code-size 8192 --iram-size 256 --std-sdcc11 $(EXTRA)
 BUILD   = build
-SRCS    = main.c delay.c uart.c lcd.c i2c.c bme280.c altitude.c
+SRCS    = main.c delay.c lcd.c i2c.c bme280.c altitude.c
+
+# serial debug prints cost ~400 B of flash and need a USB-RS232 adapter:
+# make clean flash EXTRA=-DUART_DEBUG
+ifneq (,$(findstring UART_DEBUG,$(EXTRA)))
+SRCS   += uart.c
+endif
 OBJS    = $(addprefix $(BUILD)/,$(SRCS:.c=.rel))
 HDRS    = $(wildcard src/*.h)
 

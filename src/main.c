@@ -1,7 +1,9 @@
 #include <8052.h>
 #include <stdint.h>
 #include "delay.h"
+#ifdef UART_DEBUG
 #include "uart.h"
+#endif
 #include "lcd.h"
 #include "i2c.h"
 #include "bme280.h"
@@ -46,7 +48,9 @@ void main(void)
 	uint32_t p, p_avg, p0 = P0_STD;
 	uint32_t p_sum = 0;		/* (1 << AVG_SHIFT) x average pressure */
 
+#ifdef UART_DEBUG
 	uart_init();
+#endif
 	lcd_init();
 	i2c_init();
 
@@ -84,7 +88,7 @@ void main(void)
 				p_sum = p << AVG_SHIFT;
 			p_sum += p - (p_sum >> AVG_SHIFT);
 			p_avg = p_sum >> AVG_SHIFT;
-			alt = altitude_dm(p_avg) - altitude_dm(p0);
+			alt = altitude_hyps_dm(p_avg, p0, t);
 
 			lcd_goto(0, 0);
 			lcd_puts("Alt:");
@@ -99,6 +103,7 @@ void main(void)
 			lcd_tenths(p_avg / 10, 6);
 			lcd_putc(' ');
 
+#ifdef UART_DEBUG
 			uart_puts("T=");
 			uart_put_i32(t);
 			uart_puts(" P=");
@@ -107,6 +112,7 @@ void main(void)
 			uart_put_i32(alt);
 			uart_putc(relative ? 'R' : 'A');
 			uart_crlf();
+#endif
 		}
 		if (++poll >= SAMPLE_POLLS)
 			poll = 0;

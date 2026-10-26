@@ -40,3 +40,31 @@ int32_t altitude_dm(uint32_t p)
 	f = p % STEP;
 	return table[i] + (table[i + 1] - table[i]) * f / STEP;
 }
+
+/* Hypsometric equation for an isothermal layer of air:
+ *     h = (R / (M g)) * T * ln(p0 / p),   R / (M g) = 29.27 m/K
+ * Warm air is less dense, so the same pressure drop is a bigger height
+ * than the 15 degC standard atmosphere above assumes (~6% at 32 degC).
+ *
+ * ln(p0 / p) = 2 artanh(x), x = (p0 - p) / (p0 + p), and artanh(x) ~ x
+ * for small x, so h ~ 2 * 29.27 * T * (p0 - p) / (p0 + p).
+ * In 0.1 m with t in 0.01 degC: H = 585.4 * T_K = 5.854 * (t + 27315).
+ * k = H / 8 and (p0 + p) / 8 keep k * (p0 - p) inside int32.
+ * Checked against the exact formula by tools/check_hyps.py. */
+#define DP_MAX 80000L
+
+int32_t altitude_hyps_dm(uint32_t p, uint32_t p0, int32_t t) __reentrant
+{
+	int32_t k, dp, d;
+
+	k = 5854L * (t + 27315L) / 8000;
+	dp = (int32_t)p0 - (int32_t)p;
+	if (dp > DP_MAX)
+		dp = DP_MAX;
+	else if (dp < -DP_MAX)
+		dp = -DP_MAX;
+	dp *= k;
+	d = (int32_t)((p0 + p) >> 3);
+	dp += dp >= 0 ? d / 2 : -(d / 2);	/* round to nearest */
+	return dp / d;
+}
