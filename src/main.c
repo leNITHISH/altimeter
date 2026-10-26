@@ -8,14 +8,34 @@
 #include "i2c.h"
 #include "bme280.h"
 #include "altitude.h"
+#include "kalman.h"
 
-#define LED P2_0
-#define BTN P3_3		/* active low, onboard button (JP2) */
+#define LED  P2_0
+#define BTN  P3_3		/* onboard (JP2): tap = zero, hold 2 s = absolute */
+#define BTN2 P3_2		/* external, to GND: tap = next view, hold 1 s = QNH */
 
 #define P0_STD		101325UL	/* Pa, standard sea level */
-#define SAMPLE_POLLS	5		/* read the sensor every 5 ticks = 250 ms */
-#define HOLD_POLLS	40		/* 2 s hold = back to absolute mode */
-#define AVG_SHIFT	3		/* running average over ~8 samples */
+#define SAMPLE_TICKS	5		/* read the sensor every 5 ticks = 250 ms */
+#define TAP_TICKS	2		/* >= 100 ms counts as a press */
+#define HOLD_ABS_TICKS	40		/* onboard 2 s hold = absolute mode */
+#define HOLD2_TICKS	20		/* external 1 s hold */
+#define QNH_MIN		8700		/* 0.1 hPa, lowest sea-level pressure on record ~870 */
+#define QNH_MAX		10850		/* highest ~1084 */
+
+#define LCD_CURSOR_ON	0x0E		/* display on, underline cursor */
+#define LCD_CURSOR_OFF	0x0C
+
+enum { VIEW_TP, VIEW_ISA, VIEW_VARIO, VIEW_QNH, NVIEWS };
+enum { EV_NONE, EV_TAP, EV_HOLD };
+
+static uint8_t relative;		/* 0 = absolute (p0 = QNH), 1 = zeroed */
+static uint8_t view;
+static uint32_t qnh = P0_STD;		/* Pa, sea-level pressure for absolute mode */
+static uint32_t p0_q2 = P0_STD * 4;	/* reference pressure, Pa * 4 */
+
+/* QNH editor: five digits of the value in 0.1 hPa, e.g. 1013.2 */
+static uint8_t editing, edit_pos;
+static __idata uint8_t digits[5];
 
 /* print v (in tenths) right-aligned in width chars, e.g. 1008.4 */
 static void lcd_tenths(int32_t v, uint8_t width)
@@ -40,13 +60,128 @@ static void lcd_tenths(int32_t v, uint8_t width)
 		lcd_putc(buf[i++]);
 }
 
+/* external button: a tap is reported on release, a hold once after 1 s */
+static uint8_t btn2_event(void)
+{
+	static uint8_t held2;
+	uint8_t ev = EV_NONE;
+
+	if (!BTN2) {
+		if (held2 < 255)
+			held2++;
+		if (held2 == HOLD2_TICKS)
+			ev = EV_HOLD;
+	} else {
+		if (held2 >= TAP_TICKS && held2 < HOLD2_TICKS)
+			ev = EV_TAP;
+		held2 = 0;
+	}
+	return ev;
+}
+
+static void show(int32_t t)
+{
+	uint32_t p_q2 = kf_p >> 6;	/* Kalman pressure, Pa * 4 */
+
+	lcd_goto(0, 0);
+	lcd_puts("Alt:");
+	lcd_tenths(altitude_hyps_dm(p_q2, p0_q2, t), 8);
+	lcd_puts(" m ");
+	lcd_putc(relative ? 'R' : 'A');
+
+	lcd_goto(0, 1);
+	switch (view) {
+	case VIEW_TP:
+		lcd_putc('T');
+		lcd_tenths(t / 10, 5);
+		lcd_puts("C P");
+		lcd_tenths((kf_p >> 8) / 10, 6);
+		lcd_putc(' ');
+		break;
+	case VIEW_ISA:		/* same reference, 15 degC standard atmosphere */
+		lcd_puts("ISA:");
+		lcd_tenths(altitude_dm(p_q2 >> 2) - altitude_dm(p0_q2 >> 2), 8);
+		lcd_puts(" m  ");
+		break;
+	case VIEW_VARIO:	/* height gained in the next second at rate v */
+		lcd_puts("V:  ");
+		lcd_tenths(altitude_hyps_dm(p_q2 + (kf_v >> 6), p_q2, t), 6);
+		lcd_puts(" m/s  ");
+		break;
+	default:
+		lcd_puts("QNH ");
+		lcd_tenths(qnh / 10, 6);
+		lcd_puts(" hPa  ");
+		break;
+	}
+}
+
+static void editor_draw(uint8_t bad)
+{
+	uint8_t i;
+
+	lcd_goto(0, 0);
+	lcd_puts(bad ? "Only 870-1085!  " : "Set QNH (hPa)   ");
+	lcd_goto(0, 1);
+	for (i = 0; i < 5; i++) {
+		if (i == 4)
+			lcd_putc('.');
+		lcd_putc('0' + digits[i]);
+	}
+	lcd_puts("          ");
+	lcd_goto(edit_pos < 4 ? edit_pos : 5, 1);	/* cursor under the digit */
+}
+
+static void editor_open(void)
+{
+	uint16_t v = qnh / 10;
+	uint8_t i;
+
+	for (i = 5; i--; ) {
+		digits[i] = v % 10;
+		v /= 10;
+	}
+	edit_pos = 0;
+	editing = 1;
+	editor_draw(0);
+	lcd_cmd(LCD_CURSOR_ON);
+}
+
+/* tap = next value for this digit, hold = next digit / save on the last */
+static void editor_event(uint8_t ev)
+{
+	uint16_t v;
+	uint8_t i;
+
+	if (ev == EV_TAP) {
+		digits[edit_pos] = (digits[edit_pos] + 1) % 10;
+	} else if (edit_pos < 4) {
+		edit_pos++;
+	} else {
+		v = 0;
+		for (i = 0; i < 5; i++)
+			v = v * 10 + digits[i];
+		edit_pos = 0;
+		if (v < QNH_MIN || v > QNH_MAX) {
+			editor_draw(1);
+			return;
+		}
+		qnh = (uint32_t)v * 10;
+		p0_q2 = qnh * 4;
+		relative = 0;
+		editing = 0;
+		lcd_cmd(LCD_CURSOR_OFF);
+		return;
+	}
+	editor_draw(0);
+}
+
 void main(void)
 {
-	uint8_t id, poll = 0, held = 0;
-	uint8_t relative = 0;
-	int32_t t, alt;
-	uint32_t p, p_avg, p0 = P0_STD;
-	uint32_t p_sum = 0;		/* (1 << AVG_SHIFT) x average pressure */
+	uint8_t id, tick = 0, held = 0, ev;
+	uint8_t have_kf = 0, redraw = 0;
+	int32_t t = 0;
+	uint32_t p;
 
 #ifdef UART_DEBUG
 	uart_init();
@@ -61,61 +196,65 @@ void main(void)
 			;
 	}
 	lcd_puts(id == BME280_ID ? "BME280" : "BMP280");
-	delay_ms(200);		/* first IIR-filtered sample */
+	delay_ms(200);		/* first filtered sample */
 	tick_init();
 
 	for (;;) {
-		/* press = zero here (relative mode), hold 2 s = absolute mode */
+		/* onboard: press = zero here (relative), hold 2 s = absolute */
 		if (!BTN) {
 			if (held < 255)
 				held++;
-			if (held == 2 && p_sum) {
-				p0 = p_sum >> AVG_SHIFT;
+			if (held == TAP_TICKS && have_kf) {
+				p0_q2 = kf_p >> 6;
 				relative = 1;
-				poll = 0;	/* show the new zero right away */
-			} else if (held == HOLD_POLLS) {
-				p0 = P0_STD;
+				redraw = 1;
+			} else if (held == HOLD_ABS_TICKS) {
+				p0_q2 = qnh * 4;
 				relative = 0;
-				poll = 0;
+				redraw = 1;
 			}
 		} else {
 			held = 0;
 		}
 
-		if (poll == 0 && bme280_read(&t, &p)) {
+		ev = btn2_event();
+		if (ev != EV_NONE) {
+			if (editing) {
+				editor_event(ev);
+			} else if (ev == EV_TAP) {
+				view = (view + 1) % NVIEWS;
+				redraw = 1;
+			} else {
+				editor_open();
+			}
+		}
+
+		/* fixed 0.25 s sample period: the Kalman model depends on it */
+		if (tick == 0 && bme280_read(&t, &p)) {
 			LED = !LED;
-			if (!p_sum)
-				p_sum = p << AVG_SHIFT;
-			p_sum += p - (p_sum >> AVG_SHIFT);
-			p_avg = p_sum >> AVG_SHIFT;
-			alt = altitude_hyps_dm(p_avg, p0, t);
-
-			lcd_goto(0, 0);
-			lcd_puts("Alt:");
-			lcd_tenths(alt, 8);
-			lcd_puts(" m ");
-			lcd_putc(relative ? 'R' : 'A');
-
-			lcd_goto(0, 1);
-			lcd_putc('T');
-			lcd_tenths(t / 10, 5);
-			lcd_puts("C P");
-			lcd_tenths(p_avg / 10, 6);
-			lcd_putc(' ');
-
+			if (have_kf) {
+				kalman_step(p);
+			} else {
+				kalman_init(p);
+				have_kf = 1;
+			}
+			redraw = 1;
 #ifdef UART_DEBUG
 			uart_puts("T=");
 			uart_put_i32(t);
 			uart_puts(" P=");
 			uart_put_i32(p);
-			uart_puts(" alt=");
-			uart_put_i32(alt);
-			uart_putc(relative ? 'R' : 'A');
+			uart_puts(" Pk=");
+			uart_put_i32(kf_p >> 8);
 			uart_crlf();
 #endif
 		}
-		if (++poll >= SAMPLE_POLLS)
-			poll = 0;
+		if (redraw && have_kf && !editing) {
+			show(t);
+			redraw = 0;
+		}
+		if (++tick >= SAMPLE_TICKS)
+			tick = 0;
 		tick_wait();
 	}
 }

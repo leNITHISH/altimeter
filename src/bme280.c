@@ -10,7 +10,7 @@
 #define REG_CONFIG	0xF5
 #define REG_DATA	0xF7
 
-#define CONFIG_VAL	0x30	/* standby 62.5 ms, IIR x16 */
+#define CONFIG_VAL	0x2C	/* standby 62.5 ms, IIR x8 (the Kalman filter does the rest) */
 #define CTRL_MEAS_VAL	0x57	/* osrs_t x2, osrs_p x16, normal mode */
 
 static uint8_t addr;
