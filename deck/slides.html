@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>8051 Barometric Altimeter: Final Review</title>
+<!-- Build: chromium --headless --no-pdf-header-footer \
+       --print-to-pdf=deck/altimeter-final-review.pdf deck/slides.html -->
+<style>
+@font-face { font-family: 'Plex Sans'; src: url(fonts/IBMPlexSans.woff2) format('woff2'); font-weight: 100 700; }
+@font-face { font-family: 'Plex Mono'; src: url(fonts/IBMPlexMono-400.woff2) format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Plex Mono'; src: url(fonts/IBMPlexMono-500.woff2) format('woff2'); font-weight: 500; }
+
+:root {
+  --paper: #f2f0eb;
+  --card: #f9f8f5;
+  --line: #d9d5ca;
+  --navy: #13202a;
+  --ink: #13202a;
+  --muted: #55606a;
+  --amber-d: #a85c0e;
+  --amber: #e39a2d;
+  --tint: #e7e4da;
+}
+@page { size: 1280px 720px; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Plex Sans', 'DejaVu Sans', sans-serif;
+  color: var(--ink);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.slide {
+  width: 1280px; height: 720px;
+  padding: 72px 88px 56px;
+  position: relative; overflow: hidden;
+  background: var(--paper);
+  break-after: page;
+}
+.slide:last-child { break-after: auto; }
+.dark { background: var(--navy); color: #f1ede4; }
+.eyebrow {
+  font-family: 'Plex Mono', monospace; font-size: 15px; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--amber-d); margin-bottom: 10px;
+}
+.dark .eyebrow { color: var(--amber); }
+h1 { font-size: 42px; font-weight: 600; line-height: 1.12; margin: 0 0 30px; letter-spacing: -.01em; }
+h2 { font-size: 22px; font-weight: 600; margin: 0 0 10px; }
+p { margin: 0 0 12px; }
+.lead { font-size: 22px; line-height: 1.45; color: var(--ink); }
+.muted { color: var(--muted); }
+.small { font-size: 15px; line-height: 1.45; }
+.mono { font-family: 'Plex Mono', monospace; }
+.num {
+  position: absolute; right: 88px; bottom: 30px;
+  font-family: 'Plex Mono', monospace; font-size: 13px; color: #8a8f92;
+}
+.dark .num { color: #6d7a84; }
+
+.row { display: flex; gap: 22px; }
+.col { flex: 1; min-width: 0; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 22px 26px;
+}
+.card.tint { background: var(--tint); border-color: var(--tint); }
+.card.ink { background: var(--navy); border-color: var(--navy); color: #e9e5dc; }
+.card .label {
+  font-family: 'Plex Mono', monospace; font-size: 13px; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--amber-d); margin-bottom: 10px;
+}
+.card.ink .label { color: var(--amber); }
+.card p, .card li { font-size: 19px; line-height: 1.5; }
+.card.ink .dim { color: #a9b3ba; }
+ul { margin: 0; padding-left: 20px; }
+li { margin-bottom: 7px; }
+li::marker { color: var(--amber-d); }
+
+table { border-collapse: collapse; width: 100%; font-size: 18.5px; }
+th {
+  background: var(--navy); color: #f1ede4; text-align: left; font-weight: 600;
+  padding: 11px 14px; border: 1px solid var(--navy);
+}
+td { padding: 10px 14px; border: 1px solid var(--line); background: var(--card); vertical-align: top; line-height: 1.38; }
+tr:nth-child(even) td { background: #efede7; }
+td.k { color: var(--ink); white-space: nowrap; }
+td { color: #3f4a52; }
+td.hl { color: var(--amber-d); font-weight: 600; }
+
+.eq {
+  font-family: 'Plex Mono', monospace; font-size: 19px; line-height: 1.6;
+  background: var(--navy); color: #f1ede4; border-radius: 10px; padding: 18px 24px;
+  white-space: pre;
+}
+.eq .c { color: #8f9ba4; }
+.eq .a { color: var(--amber); }
+
+.lcd {
+  display: inline-block; background: #2b351f; border-radius: 10px; padding: 14px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+}
+.lcd .scr {
+  text-align: left;
+  background: #a6c03d; color: #1d2614; border-radius: 3px; padding: 12px 18px;
+  font-family: 'Plex Mono', monospace; font-size: 29px; line-height: 1.32;
+  white-space: pre; letter-spacing: .02em;
+}
+.lcd.sm { padding: 9px; border-radius: 8px; box-shadow: none; }
+.lcd.sm .scr { font-size: 19px; padding: 8px 12px; }
+.cur { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 4px; }
+
+.stat .big { font-size: 64px; font-weight: 600; line-height: 1; color: var(--amber); letter-spacing: -.02em; }
+.stat .cap { font-size: 17px; margin-top: 8px; color: #e9e5dc; }
+.stat .sub { font-size: 14px; margin-top: 4px; color: #a9b3ba; }
+
+.bars { font-size: 15px; }
+.bar { display: flex; align-items: center; margin-bottom: 7px; }
+.bar .n { width: 150px; color: var(--ink); font-family: 'Plex Mono', monospace; font-size: 15px; }
+.bar .b { height: 18px; background: var(--amber-d); border-radius: 3px; }
+.bar .b.lib { background: #8a8f92; }
+.bar .v { margin-left: 10px; color: var(--muted); font-family: 'Plex Mono', monospace; font-size: 14px; }
+
+.note { font-size: 16px; color: var(--muted); line-height: 1.45; }
+.step { font-family: 'Plex Mono', monospace; color: var(--amber-d); font-size: 14px; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<!-- 1. Title -->
+<section class="slide dark">
+  <div class="eyebrow" style="margin-top:28px">MPMC project · Final review</div>
+  <div class="row" style="align-items:center; margin-top:92px">
+    <div class="col" style="flex:1.25">
+      <h1 style="font-size:66px; line-height:1.05; margin-bottom:22px">A barometric altimeter on the 8051</h1>
+      <p class="lead" style="color:#c6cdd2; font-size:20px">AT89S52, BMP280 pressure sensor and a 16×2 LCD.<br>Written in C, built with SDCC and flashed from Linux.</p>
+    </div>
+    <div class="col" style="flex:.85; text-align:right">
+      <div class="lcd"><div class="scr">Alt:     1.0 m R
+V:     0.3 m/s  </div></div>
+    </div>
+  </div>
+  <p style="position:absolute; left:88px; bottom:64px; font-size:16px; color:#c6cdd2">Nithish Siva Kumar · 23BCE1230 · Guide: Dr. Sivasubramanian A</p>
+</section>
+
+<!-- 2. Overview -->
+<section class="slide">
+  <div class="eyebrow">Overview</div>
+  <h1>What the device does</h1>
+  <p class="lead" style="max-width:1000px; margin-bottom:28px">Near sea level, air pressure drops by about 12 Pa for every metre you climb. The BMP280 resolves single pascals, so the 8051 can turn pressure into height and show it on the LCD four times a second.</p>
+  <div class="row">
+    <div class="card col">
+      <div class="label">Working at review 2</div>
+      <ul>
+        <li>Relative altitude: press a button to set 0 m here</li>
+        <li>Absolute altitude against 1013.25 hPa</li>
+        <li>Temperature and pressure on line 2</li>
+        <li>Integer-only maths, 4 updates per second</li>
+      </ul>
+    </div>
+    <div class="card col">
+      <div class="label">Added since (the planned future work)</div>
+      <ul>
+        <li>Altitude corrected for the measured air temperature</li>
+        <li>2-state Kalman filter, which also gives vertical speed</li>
+        <li>Second button to enter today's sea-level pressure (QNH)</li>
+        <li>Four display views, including a side-by-side comparison</li>
+      </ul>
+    </div>
+  </div>
+  <div class="num">02</div>
+</section>
+
+<!-- 3. Block diagram -->
+<section class="slide">
+  <div class="eyebrow">Hardware</div>
+  <h1 style="margin-bottom:18px">Block diagram</h1>
+  <svg width="1104" height="480" viewBox="0 0 1104 480" style="font-family:'Plex Sans'">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#55606a"/>
+      </marker>
+    </defs>
+    <!-- sensor -->
+    <rect x="0" y="140" width="240" height="110" rx="10" fill="#f9f8f5" stroke="#d9d5ca"/>
+    <text x="20" y="182" font-size="22" font-weight="600" fill="#13202a">BMP280 sensor</text>
+    <text x="20" y="210" font-size="16" fill="#55606a">pressure + temperature</text>
+    <text x="20" y="232" font-size="16" fill="#55606a">I2C address 0x76</text>
+    <line x1="242" y1="195" x2="418" y2="195" stroke="#55606a" stroke-width="1.6" marker-start="url(#ar)" marker-end="url(#ar)"/>
+    <text x="262" y="182" font-size="15.5" fill="#13202a">I2C, bit-banged</text>
+    <text x="262" y="220" font-size="15" fill="#55606a" font-family="Plex Mono">P1.0 / P1.1</text>
+    <!-- mcu -->
+    <rect x="420" y="40" width="250" height="310" rx="10" fill="#13202a"/>
+    <text x="444" y="92" font-size="32" font-weight="600" fill="#f1ede4">AT89S52</text>
+    <text x="444" y="128" font-size="16" fill="#a9b3ba">8051 core, 11.0592 MHz</text>
+    <text x="444" y="154" font-size="16" fill="#a9b3ba">8 KB flash, 256 B RAM</text>
+    <text x="444" y="180" font-size="16" fill="#a9b3ba">Timer2: 50 ms loop tick</text>
+    <text x="444" y="320" font-size="16" fill="#e39a2d">C firmware, SDCC</text>
+    <!-- lcd -->
+    <rect x="854" y="40" width="250" height="110" rx="10" fill="#f9f8f5" stroke="#d9d5ca"/>
+    <text x="874" y="80" font-size="22" font-weight="600" fill="#13202a">16×2 LCD</text>
+    <text x="874" y="108" font-size="16" fill="#55606a">HD44780, 4-bit, RW to GND</text>
+    <text x="874" y="130" font-size="16" fill="#55606a">contrast: 10k pot on V0</text>
+    <line x1="672" y1="95" x2="850" y2="95" stroke="#55606a" stroke-width="1.6" marker-end="url(#ar)"/>
+    <text x="684" y="84" font-size="15" fill="#55606a" font-family="Plex Mono">P2.1, P2.2</text>
+    <text x="684" y="118" font-size="15" fill="#55606a" font-family="Plex Mono">P2.4–P2.7</text>
+    <!-- buttons -->
+    <rect x="854" y="170" width="250" height="110" rx="10" fill="#f9f8f5" stroke="#d9d5ca"/>
+    <text x="874" y="210" font-size="22" font-weight="600" fill="#13202a">Two buttons</text>
+    <text x="874" y="238" font-size="16" fill="#55606a">onboard: zero / absolute</text>
+    <text x="874" y="260" font-size="16" fill="#55606a">external: view / QNH</text>
+    <line x1="850" y1="225" x2="674" y2="225" stroke="#55606a" stroke-width="1.6" marker-end="url(#ar)"/>
+    <text x="684" y="214" font-size="15" fill="#55606a" font-family="Plex Mono">P3.3, P3.2</text>
+    <!-- led -->
+    <rect x="854" y="300" width="250" height="84" rx="10" fill="#f9f8f5" stroke="#d9d5ca"/>
+    <text x="874" y="338" font-size="22" font-weight="600" fill="#13202a">Status LED</text>
+    <text x="874" y="364" font-size="16" fill="#55606a">toggles every reading</text>
+    <line x1="672" y1="330" x2="850" y2="330" stroke="#55606a" stroke-width="1.6" marker-end="url(#ar)"/>
+    <text x="684" y="319" font-size="15" fill="#55606a" font-family="Plex Mono">P2.0</text>
+    <!-- programmer -->
+    <rect x="420" y="388" width="250" height="88" rx="10" fill="#e7e4da" stroke="#a9a596" stroke-dasharray="5 4"/>
+    <text x="440" y="424" font-size="19" font-weight="600" fill="#13202a">USBasp programmer</text>
+    <text x="440" y="452" font-size="16" fill="#55606a">avrdude, ISP, from Linux</text>
+    <line x1="545" y1="386" x2="545" y2="354" stroke="#55606a" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  </svg>
+  <div class="num">03</div>
+</section>
+
+<!-- 4. Pin map -->
+<section class="slide">
+  <div class="eyebrow">Hardware</div>
+  <h1>Pin map</h1>
+  <div class="row">
+    <div style="flex:1.45">
+      <table>
+        <tr><th>Signal</th><th>Pin</th><th>Notes</th></tr>
+        <tr><td class="k">I2C SCL, SDA</td><td class="mono">P1.0, P1.1</td><td>bit-banged</td></tr>
+        <tr><td class="k">LCD RS, E</td><td class="mono">P2.1, P2.2</td><td>control lines</td></tr>
+        <tr><td class="k">LCD D4–D7</td><td class="mono">P2.4–P2.7</td><td>4-bit data, RW tied to GND</td></tr>
+        <tr><td class="k">Status LED</td><td class="mono">P2.0</td><td>onboard</td></tr>
+        <tr><td class="k">Zero button</td><td class="mono">P3.3</td><td>onboard, active low</td></tr>
+        <tr><td class="k">View / QNH button</td><td class="mono">P3.2</td><td>external, to GND</td></tr>
+        <tr><td class="k">UART TX, RX</td><td class="mono">P3.1, P3.0</td><td>debug build only, via MAX232</td></tr>
+      </table>
+    </div>
+    <div class="card col">
+      <div class="label">Notes</div>
+      <p>Port 0 is unused. On this board it is open drain with no pull-ups, so it can't drive a line high.</p>
+      <p>Ports 1–3 are quasi-bidirectional. Writing 1 only enables a weak pull-up, so the buttons need no resistors and the I2C slave can always pull a line low.</p>
+      <p style="margin:0">LCD pins are written one bit at a time, so the LED on P2.0 is never disturbed.</p>
+    </div>
+  </div>
+  <div class="num">04</div>
+</section>
+
+<!-- 5. Firmware flow -->
+<section class="slide">
+  <div class="eyebrow">Firmware</div>
+  <h1>How the program runs</h1>
+  <div class="step" style="margin-bottom:10px">AT POWER-UP</div>
+  <div class="row" style="gap:14px; margin-bottom:28px">
+    <div class="card col" style="padding:18px 20px"><h2 style="font-size:19px">LCD</h2><p class="small muted" style="margin:0">4-bit init sequence</p></div>
+    <div class="card col" style="padding:18px 20px"><h2 style="font-size:19px">I2C bus</h2><p class="small muted" style="margin:0">up to 9 clocks free a stuck sensor</p></div>
+    <div class="card col" style="padding:18px 20px"><h2 style="font-size:19px">Sensor</h2><p class="small muted" style="margin:0">probe 0x76/0x77, check ID, reset</p></div>
+    <div class="card col" style="padding:18px 20px"><h2 style="font-size:19px">Calibration</h2><p class="small muted" style="margin:0">24 bytes, one burst read</p></div>
+    <div class="card col" style="padding:18px 20px"><h2 style="font-size:19px">Timer2</h2><p class="small muted" style="margin:0">start the 50 ms tick</p></div>
+  </div>
+  <div class="step" style="margin-bottom:10px">THEN, FOREVER</div>
+  <div class="row">
+    <div class="card ink" style="flex:.8">
+      <div class="label">Every 50 ms tick</div>
+      <p>Read both buttons and count how long each is held. Taps and holds trigger zero, absolute mode, the next view or the QNH editor.</p>
+    </div>
+    <div class="card ink" style="flex:1.2">
+      <div class="label">Every 5th tick (250 ms)</div>
+      <p>Read raw data → Bosch compensation → Kalman step → altitude → redraw the LCD → toggle the LED.</p>
+      <p class="dim" style="margin:0; font-size:15.5px">Timer2 runs in auto-reload mode, so the period stays exactly 250 ms however long the maths takes. The Kalman model depends on a fixed time step.</p>
+    </div>
+  </div>
+  <div class="num">05</div>
+</section>
+
+<!-- 6. Sensor -->
+<section class="slide">
+  <div class="eyebrow">The sensor</div>
+  <h1>Talking to the BMP280</h1>
+  <div class="row">
+    <div style="flex:1.2">
+      <table>
+        <tr><th>Register</th><th>Value</th><th>Meaning</th></tr>
+        <tr><td class="k mono">0xD0 id</td><td class="mono">0x58</td><td>BMP280 (sold as a BME280)</td></tr>
+        <tr><td class="k mono">0xE0 reset</td><td class="mono">0xB6</td><td>soft reset, wait 5 ms</td></tr>
+        <tr><td class="k mono">0xF5 config</td><td class="mono">0x2C</td><td>IIR filter ×8, 62.5 ms standby</td></tr>
+        <tr><td class="k mono">0xF4 ctrl_meas</td><td class="mono">0x57</td><td>pressure ×16, temp ×2, normal mode</td></tr>
+        <tr><td class="k mono">0x88–0x9F</td><td class="mono">read</td><td>12 factory calibration constants</td></tr>
+        <tr><td class="k mono">0xF7–0xFC</td><td class="mono">read</td><td>raw 20-bit pressure and temperature</td></tr>
+      </table>
+    </div>
+    <div class="card ink col">
+      <div class="label">Raw counts to real units</div>
+      <p>Bosch's 32-bit integer formulas combine the raw counts with the calibration constants: temperature in 0.01 °C, pressure in whole pascals (about 8 cm of height).</p>
+      <p>SDCC's <span class="mono">int</span> is 16 bits, so every term is cast to <span class="mono">int32_t</span>. Without the casts the intermediates overflow silently.</p>
+      <p class="dim" style="margin:0">Both the sensor and SDCC store multi-byte values little-endian, so the calibration bytes go straight into a C struct.</p>
+    </div>
+  </div>
+  <div class="num">06</div>
+</section>
+
+<!-- 7. Standard atmosphere + table -->
+<section class="slide">
+  <div class="eyebrow">Pressure to height · 1</div>
+  <h1>The standard-atmosphere formula</h1>
+  <div class="eq" style="margin-bottom:24px">h = 44330 × (1 − (P / P0)<span class="a">^0.1903</span>)       <span class="c">P0 = 101325 Pa, assumes 15 °C at sea level</span></div>
+  <div class="row">
+    <div class="card tint col">
+      <div class="label">Problem</div>
+      <p>The fractional power needs <span class="mono">powf</span>, which on an 8051 is a software log and exp. It pushed the program to about 7.3 of the 8 KB of flash and overflowed RAM.</p>
+    </div>
+    <div class="card col" style="flex:1.35">
+      <div class="label">Lookup table</div>
+      <ul>
+        <li>A Python script evaluates the formula every 1024 Pa from 86 016 to 106 496 Pa (about +1.3 km to −430 m): 21 values in flash.</li>
+        <li>Stored as 16-bit values with an offset. A 1024 Pa step means the 8051 interpolates with shifts, not division.</li>
+        <li>Error against the exact formula: under 0.2 m.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="note" style="margin-top:18px">The table now feeds the "ISA" comparison view. The main reading uses the temperature-corrected formula on the next slide.</p>
+  <div class="num">07</div>
+</section>
+
+<!-- 8. Temperature correction -->
+<section class="slide">
+  <div class="eyebrow">Pressure to height · 2</div>
+  <h1>Correcting for air temperature</h1>
+  <div class="row">
+    <div class="col" style="flex:1.15">
+      <p class="lead" style="font-size:19px">The standard formula assumes 15 °C air. Warm air is less dense, so the same pressure drop means more height. The hypsometric equation uses the measured temperature instead:</p>
+      <div class="eq" style="margin:14px 0 14px">h = 29.27 m/K × T × ln(P0 / P)
+<span class="c">ln(P0/P) ≈ 2(P0 − P)/(P0 + P)  for small ratios</span>
+<span class="c">8051: k = 5854·(t + 27315)/8000</span>
+<span class="c">      h = k·(P0 − P) / ((P0 + P)/8)  [0.1 m]</span></div>
+      <p class="note">All 32-bit integers: t in 0.01 °C, P in units of ¼ Pa. Matches the exact formula within 0.09 m (tools/check_hyps.py). This is separate from Bosch's compensation, which corrects the pressure reading for the chip's own temperature.</p>
+    </div>
+    <div class="col" style="flex:.85">
+      <table>
+        <tr><th>Air temp</th><th>Standard</th><th>Corrected</th></tr>
+        <tr><td class="k">0 °C</td><td>99.5 m</td><td>94.4 m</td></tr>
+        <tr><td class="k">15 °C</td><td>99.5 m</td><td>99.6 m</td></tr>
+        <tr><td class="k">25 °C</td><td>99.5 m</td><td>103.0 m</td></tr>
+        <tr><td class="k">32.8 °C (our room)</td><td>99.5 m</td><td class="hl">105.7 m</td></tr>
+        <tr><td class="k">40 °C</td><td>99.5 m</td><td>108.2 m</td></tr>
+      </table>
+      <p class="note" style="margin-top:10px">Height for the same 11.9 hPa pressure drop. At 32.8 °C the standard formula reads 5.9 % low, so a 1 m lift would show about 0.94 m.</p>
+    </div>
+  </div>
+  <div class="num">08</div>
+</section>
+
+<!-- 9. Kalman model -->
+<section class="slide">
+  <div class="eyebrow">Filtering · 1</div>
+  <h1>A 2-state Kalman filter</h1>
+  <div class="row">
+    <div class="col" style="flex:1.1">
+      <p style="font-size:18px; line-height:1.5">State: pressure <span class="mono">p</span> and its rate of change <span class="mono">v</span>. Model: constant velocity with random acceleration, one step every 0.25 s.</p>
+      <div class="eq" style="font-size:17px"><span class="c">predict</span>  p ← p + v·dt
+         P ← F·P·Fᵀ + Q
+<span class="c">update</span>   K ← P·Hᵀ / (H·P·Hᵀ + R)
+         [p v] ← [p v] + K·(z − p)
+         P ← (I − K·H)·P</div>
+      <p class="note" style="margin-top:12px">z = measured pressure. Q: how hard the board may be moved. R: sensor noise. K is the gain that balances the two.</p>
+    </div>
+    <div class="card col" style="flex:.9">
+      <div class="label">On the 8051</div>
+      <ul>
+        <li>The full filter runs on the chip: the covariance P is updated every step, so the gain starts high and settles as confidence grows.</li>
+        <li>32-bit fixed point: p, v and P scaled by 256, gains by 4096; dt = ¼ s becomes a shift.</li>
+        <li>It filters pressure, not altitude, so re-zeroing or a new QNH never disturbs it.</li>
+        <li>Tuning: sensor noise 0.71 Pa, acceleration 0.1 m/s². Steady-state gains 0.37 and 0.33/s.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="num">09</div>
+</section>
+
+<!-- 10. Kalman results -->
+<section class="slide">
+  <div class="eyebrow">Filtering · 2</div>
+  <h1>What the filter changes</h1>
+  <div class="row">
+    <div class="col" style="flex:1.25">
+      <table>
+        <tr><th></th><th>Old: sensor IIR ×16 + running average</th><th>New: sensor IIR ×8 + Kalman</th></tr>
+        <tr><td class="k">Jitter at rest</td><td>3.8 cm</td><td>5.9 cm</td></tr>
+        <tr><td class="k">Lag behind a 1 m lift</td><td>3.25 s</td><td class="hl">1.0 s</td></tr>
+        <tr><td class="k">Vertical speed</td><td>none</td><td class="hl">yes, ±2 cm/s at rest</td></tr>
+      </table>
+      <p class="note" style="margin-top:14px">Both jitter figures are below the 0.1 m display step. The sensor's own filter was turned down so the Kalman filter, which knows about motion, does the smoothing.</p>
+    </div>
+    <div class="card tint col" style="flex:.75">
+      <div class="label">How these were measured</div>
+      <p style="font-size:16px">tools/kalman_sim.py models the sensor (noise, its IIR filter, 1 Pa rounding) and a 1 m lift. It runs a float Kalman filter next to a line-by-line copy of the C integer code: they agree within 0.3 cm.</p>
+      <p style="font-size:16px; margin:0">With no serial adapter we couldn't log real data, so on the board it was checked by eye: steady at rest, follows a lift, vertical speed positive going up and negative going down.</p>
+    </div>
+  </div>
+  <div class="num">10</div>
+</section>
+
+<!-- 11. QNH -->
+<section class="slide">
+  <div class="eyebrow">Absolute altitude</div>
+  <h1>Entering today's sea-level pressure</h1>
+  <div class="row">
+    <div class="col" style="flex:1.2">
+      <p style="font-size:18px; line-height:1.5">Absolute mode assumed 1013.25 hPa at sea level. Real sea-level pressure changes with the weather, and every 1 hPa of difference moves the reading by about 8 m.</p>
+      <p style="font-size:18px; line-height:1.5">QNH is the current pressure reduced to sea level. Airports publish it every half hour in their METAR reports, e.g. <span class="mono">Q1011</span> = 1011 hPa. Entering it is how aircraft altimeters are set.</p>
+      <div class="card" style="margin-top:6px">
+        <div class="label">Editor, external button</div>
+        <p style="margin-bottom:4px">Hold 1 s to open. Tap: current digit +1. Hold: next digit. Hold on the last digit: save and switch to absolute mode.</p>
+        <p class="muted" style="margin:0; font-size:15.5px">Values outside 870–1085 hPa (the recorded extremes) are rejected.</p>
+      </div>
+    </div>
+    <div class="col" style="flex:.8; text-align:center; padding-top:20px">
+      <div class="lcd"><div class="scr">Set QNH (hPa)
+101<span class="cur">1</span>.0          </div></div>
+      <p class="note" style="margin-top:22px; text-align:left">The value lives in RAM, so it resets to 1013.25 hPa at power-off: the AT89S52 has no EEPROM.</p>
+    </div>
+  </div>
+  <div class="num">11</div>
+</section>
+
+<!-- 12. Controls and views -->
+<section class="slide">
+  <div class="eyebrow">Using it</div>
+  <h1>Two buttons, four views</h1>
+  <div class="row" style="align-items:flex-start">
+    <div style="flex:1">
+      <table>
+        <tr><th>Button</th><th>Tap</th><th>Hold</th></tr>
+        <tr><td class="k">Onboard, P3.3</td><td>zero here (R)</td><td>2 s: absolute (A)</td></tr>
+        <tr><td class="k">External, P3.2</td><td>next view</td><td>1 s: QNH editor</td></tr>
+      </table>
+      <p class="note" style="margin-top:14px">Line 1 always shows the temperature-corrected altitude, with R (relative) or A (absolute) at the end. The LED toggles on every reading.</p>
+      <div class="lcd sm" style="margin-top:6px"><div class="scr">Alt:     1.0 m R</div></div>
+    </div>
+    <div style="flex:1; display:grid; grid-template-columns:1fr; gap:10px">
+      <div style="display:flex; align-items:center; gap:16px"><div class="lcd sm"><div class="scr">T 32.8C P1013.9 </div></div><span class="small muted">temperature, pressure</span></div>
+      <div style="display:flex; align-items:center; gap:16px"><div class="lcd sm"><div class="scr">ISA:     0.9 m  </div></div><span class="small muted">same height, 15 °C formula</span></div>
+      <div style="display:flex; align-items:center; gap:16px"><div class="lcd sm"><div class="scr">V:     0.3 m/s  </div></div><span class="small muted">vertical speed (Kalman)</span></div>
+      <div style="display:flex; align-items:center; gap:16px"><div class="lcd sm"><div class="scr">QNH 1013.2 hPa  </div></div><span class="small muted">sea-level reference</span></div>
+    </div>
+  </div>
+  <div class="num">12</div>
+</section>
+
+<!-- 13. Memory -->
+<section class="slide">
+  <div class="eyebrow">Resources</div>
+  <h1>Fitting into 8 KB of flash and 256 B of RAM</h1>
+  <div class="row">
+    <div class="col" style="flex:1.15">
+      <div class="bars">
+        <div class="bar"><span class="n">bme280.c</span><span class="b" style="width:255px"></span><span class="v">2549 B</span></div>
+        <div class="bar"><span class="n">main.c</span><span class="b" style="width:209px"></span><span class="v">2093 B</span></div>
+        <div class="bar"><span class="n">altitude.c</span><span class="b" style="width:90px"></span><span class="v">897 B</span></div>
+        <div class="bar"><span class="n">runtime lib</span><span class="b lib" style="width:88px"></span><span class="v">878 B  32-bit mul/div, startup</span></div>
+        <div class="bar"><span class="n">kalman.c</span><span class="b" style="width:87px"></span><span class="v">874 B</span></div>
+        <div class="bar"><span class="n">i2c.c</span><span class="b" style="width:50px"></span><span class="v">500 B</span></div>
+        <div class="bar"><span class="n">lcd.c</span><span class="b" style="width:25px"></span><span class="v">249 B</span></div>
+        <div class="bar"><span class="n">delay.c</span><span class="b" style="width:8px"></span><span class="v">78 B</span></div>
+      </div>
+      <ul style="margin-top:18px; font-size:17.5px; line-height:1.45">
+        <li>Calibration data and buffers in indirect RAM (<span class="mono">__idata</span>); 32-bit functions <span class="mono">__reentrant</span> so their locals use the stack.</li>
+        <li>No <span class="mono">printf</span>, no float. UART prints only in a debug build (saves 386 B).</li>
+        <li>With the new features we were 223 B over; a smaller 16-bit table and shared Kalman helpers made it fit.</li>
+      </ul>
+    </div>
+    <div class="col" style="flex:.55; display:flex; flex-direction:column; gap:18px">
+      <div class="card ink stat"><div class="big">8118 B</div><div class="cap">of 8192 B flash used</div><div class="sub">74 bytes left</div></div>
+      <div class="card ink stat"><div class="big">63 B</div><div class="cap">of stack free</div><div class="sub">only 128 B of RAM is directly addressable</div></div>
+    </div>
+  </div>
+  <div class="num">13</div>
+</section>
+
+<!-- 14. Problems -->
+<section class="slide">
+  <div class="eyebrow">Engineering</div>
+  <h1>Problems and how we solved them</h1>
+  <table>
+    <tr><th style="width:34%">Problem</th><th>Fix</th></tr>
+    <tr><td class="k">No I2C controller on the AT89S52</td><td>Bit-banged I2C on Port 1, with bus recovery at start-up</td></tr>
+    <tr><td class="k">8-bit CPU, 16-bit <span class="mono">int</span></td><td>Bosch's 32-bit formulas with explicit <span class="mono">int32_t</span> casts</td></tr>
+    <tr><td class="k"><span class="mono">powf</span> too big</td><td>Precomputed lookup table, later the hypsometric formula in integers</td></tr>
+    <tr><td class="k">Linker out of direct RAM</td><td><span class="mono">__idata</span> for data, <span class="mono">__reentrant</span> for 32-bit functions</td></tr>
+    <tr><td class="k">LCD blank, then unreadable</td><td>RW and V0 were floating. With no pot, Timer2 PWM drove V0 at 3.6 kHz; now a 10k pot.</td></tr>
+    <tr><td class="k">"BME280" turned out to be a BMP280</td><td>Read the chip ID; the code supports both</td></tr>
+    <tr><td class="k">Flashing seemed to hang</td><td>The programmer writes ~26 ms/byte; a full image takes 3.5 min</td></tr>
+  </table>
+  <div class="num">14</div>
+</section>
+
+<!-- 15. Testing -->
+<section class="slide">
+  <div class="eyebrow">Verification</div>
+  <h1>Testing</h1>
+  <div class="row">
+    <div class="card col" style="flex:.85">
+      <div class="label">On the PC</div>
+      <ul>
+        <li><span class="mono">check_hyps.py</span>: integer height formula vs exact, within 0.09 m</li>
+        <li><span class="mono">gen_alt_table.py --check</span>: table vs formula, within 0.17 m</li>
+        <li><span class="mono">kalman_sim.py</span>: C integer filter vs float, within 0.3 cm</li>
+        <li>Read SDCC's assembly to confirm <span class="mono">&gt;&gt;</span> on a signed long keeps the sign</li>
+      </ul>
+    </div>
+    <div style="flex:1.15">
+      <table>
+        <tr><th>On the board</th><th>Result</th></tr>
+        <tr><td class="k">I2C scan, chip ID</td><td>0x76, 0x58 (BMP280)</td></tr>
+        <tr><td class="k">Temperature, pressure</td><td>32.8 °C, 1013.9 hPa</td></tr>
+        <tr><td class="k">1 m lift after zeroing</td><td>about 1.0 m; ISA view slightly lower</td></tr>
+        <tr><td class="k">Vertical speed</td><td>+ going up, − going down, ~0 at rest</td></tr>
+        <tr><td class="k">QNH editor</td><td>valid value saved, 800.0 rejected</td></tr>
+        <tr><td class="k">Both buttons</td><td>all taps and holds work</td></tr>
+        <tr><td class="k">UART output</td><td class="muted">not tested: no RS-232 adapter</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="num">15</div>
+</section>
+
+<!-- 16. Limitations + next -->
+<section class="slide">
+  <div class="eyebrow">Limits and next steps</div>
+  <h1>What it can't do yet</h1>
+  <div class="row">
+    <div class="card col">
+      <div class="label">Limitations</div>
+      <ul style="font-size:16.5px">
+        <li>Absolute accuracy is about ±10 m: the sensor is ±1 hPa absolute, and QNH is rounded to 1 hPa</li>
+        <li>Weather drift in relative mode: 0.1 hPa ≈ 0.8 m, so re-zero every few hours</li>
+        <li>One temperature for the whole air column; fine for building heights, not for mountains</li>
+        <li>Zero and QNH are lost at power-off</li>
+        <li>Kalman tuning comes from simulation, not logged data</li>
+        <li>Flash is full: 74 bytes left</li>
+      </ul>
+    </div>
+    <div class="card col">
+      <div class="label">Next steps</div>
+      <ul style="font-size:16.5px">
+        <li>Swap in an AT89S8253: same 40-pin socket, 12 KB flash and 2 KB EEPROM, so settings survive power-off and there is room to grow</li>
+        <li>Or add an AT24C02 EEPROM on the existing I2C bus</li>
+        <li>Log raw data over a USB-serial adapter and tune the filter on real noise</li>
+        <li>A buzzer that beeps with vertical speed, like a glider variometer</li>
+        <li>Temperature lapse-rate correction for heights above ~1 km</li>
+      </ul>
+    </div>
+  </div>
+  <div class="num">16</div>
+</section>
+
+<!-- 17. Demo / questions -->
+<section class="slide dark">
+  <div class="eyebrow" style="margin-top:28px">Demo</div>
+  <div class="row" style="align-items:center; margin-top:40px">
+    <div class="col" style="flex:1.2">
+      <h1 style="font-size:60px; margin-bottom:28px">Questions?</h1>
+      <ol style="font-size:19px; line-height:1.6; color:#c6cdd2; padding-left:24px; margin:0">
+        <li>Tap the onboard button: 0.0 m R</li>
+        <li>Lift the board 1 m: about 1.0 m</li>
+        <li>External button: ISA view (lower), then V while moving</li>
+        <li>Hold the external button, enter today's QNH: height above sea level</li>
+      </ol>
+    </div>
+    <div class="col" style="flex:.8; text-align:right">
+      <div class="lcd"><div class="scr">Alt:     0.0 m R
+T 32.8C P1013.9 </div></div>
+    </div>
+  </div>
+  <p style="position:absolute; left:88px; bottom:64px; font-size:16px; color:#c6cdd2">Nithish Siva Kumar · 23BCE1230</p>
+</section>
+
+<!-- 18. Backup: GPS -->
+<section class="slide">
+  <div class="eyebrow">Backup</div>
+  <h1>Why a phone's GPS height disagrees</h1>
+  <p class="lead" style="font-size:19px; margin-bottom:22px">In testing, a phone GPS app showed −59.7 m "MSL" while the altimeter read about 16.5 m in absolute mode. Both are "altitude", but measured from different references:</p>
+  <table>
+    <tr><th style="width:24%">Height</th><th>Measured from</th><th style="width:30%">Typical error</th></tr>
+    <tr><td class="k">GPS, raw</td><td>the WGS84 ellipsoid, a smooth mathematical Earth</td><td>±10–30 m vertically, worse indoors</td></tr>
+    <tr><td class="k">Mean sea level</td><td>the geoid; around South India it lies roughly 60–100 m below the ellipsoid</td><td>needs a geoid model in the app</td></tr>
+    <tr><td class="k">Pressure altitude (A, 1013.25)</td><td>where the pressure would be 1013.25 hPa</td><td>~8 m per hPa of weather</td></tr>
+    <tr><td class="k">QNH altitude (A, QNH set)</td><td>sea level, via today's QNH</td><td>about ±10 m</td></tr>
+  </table>
+  <p class="note" style="margin-top:14px">The phone's −59.7 m is consistent with raw ellipsoid height that hasn't been corrected for the geoid, plus normal GPS error. For a true reference, use a surveyed elevation or a topographic map.</p>
+  <div class="num">18</div>
+</section>
+
+</body>
+</html>
