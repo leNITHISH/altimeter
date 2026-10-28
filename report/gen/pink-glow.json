@@ -1,0 +1,23 @@
+{
+  "document": { "color": "#7A1A50", "margin": 1 },
+  "paragraph": { "color": "#7A1A50" },
+  "heading": { "color": "#D61F69", "bold": true, "block_suffix": "\n" },
+  "h1": { "prefix": "", "color": "#D61F69", "bold": true },
+  "h2": { "prefix": "", "color": "#D61F69", "bold": true },
+  "h3": { "prefix": "", "color": "#B5147C", "bold": true },
+  "text": { "color": "#7A1A50" },
+  "strong": { "color": "#D61F69", "bold": true },
+  "emph": { "color": "#A57D90", "italic": true },
+  "code": { "color": "#B5147C" },
+  "item": { "block_prefix": "• " },
+  "list": { "color": "#7A1A50", "level_indent": 2 },
+  "hr": { "color": "#D8B4C6", "format": "\n──────────\n" },
+  "link": { "color": "#C2336F", "underline": true },
+  "link_text": { "color": "#C2336F", "bold": true },
+  "table": {
+    "color": "#7A1A50",
+    "center_separator": "┼",
+    "column_separator": "│",
+    "row_separator": "─"
+  }
+}

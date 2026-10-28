@@ -1,0 +1,8 @@
+- **Absolute height is good to about ±10 m.** The BMP280 is ±1 hPa absolute (about ±8 m) and METAR QNH is rounded to 1 hPa.
+- **Relative height is much better.** The sensor is ±0.12 hPa relative and the display steps in 0.1 m.
+- **Weather drift.** Pressure moves a few hPa over hours; every 0.1 hPa looks like 0.8 m. Re-zero, or enter a fresh QNH.
+- **One temperature for the whole air column.** Fine for buildings; mountains would need a lapse-rate model.
+- **The sensor reads warm.** It sits near the board; each 1 K of error is about 0.3% of the height.
+- **Kalman tuning comes from simulation,** not logged data: there was no serial adapter.
+- **No persistence.** Zero and QNH reset at power-off; the AT89S52 has no EEPROM.
+- **Flash is full:** 74 bytes left.

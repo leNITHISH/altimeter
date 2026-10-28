@@ -1,0 +1,7 @@
+avrdude -p 89S52 -c usbasp -e -U flash:w:build/main.hex:i
+Error: cannot set sck period; please check for usbasp firmware update
+Error: cannot set sck period; please check for usbasp firmware update
+Reading 8113 bytes for flash from input file main.hex
+Writing 8113 bytes to flash
+8113 bytes of flash verified
+Avrdude done.  Thank you.
